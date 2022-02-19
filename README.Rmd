@@ -1,0 +1,194 @@
+---
+output: github_document
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+# convoy-donations
+
+<!-- badges: start -->
+<!-- badges: end -->
+
+This repository includes data and code to analyze donations made in support to the convoy that occupied Ottawa during the winter of 2022 using the Christian crowdsourcing platform GiveSendGo.
+
+Load packages used for the analysis:
+```{r}
+library(cartogram)
+library(tidyverse)
+library(sf)
+```
+
+Read data:
+```{r}
+load(paste0(here::here(), "/data/da_2016_p1.rda"))
+load(paste0(here::here(), "/data/da_2016_p2.rda"))
+da_2016 <- rbind(da_2016_p1 %>% st_sf(),
+                 da_2016_p2 %>% st_sf())
+```
+
+Filter data to investigate only the Hamilton CMA (CMA_UID == "35537"):
+```{r}
+hamilton_da_2016 <- da_2016 %>%
+  filter(CMA_UID == "35537")
+```
+
+Project the geometry:
+```{r}
+hamilton_da_2016 <- hamilton_da_2016 %>%
+  st_set_crs(4326) %>%
+  st_transform(crs = 26917)
+```
+
+Plot geometry:
+```{r}
+ggplot() + 
+  geom_sf(data = hamilton_da_2016)
+```
+
+Create population-based cartogram:
+```{r}
+DA_pop_cartogram <- cartogram_cont(hamilton_da_2016, 
+                                   weight = "Population")
+```
+
+Summary:
+```{r}
+summary(hamilton_da_2016)
+```
+
+Replace NAs (donation_n and donation_amount):
+```{r}
+hamilton_da_2016 <- hamilton_da_2016 %>%
+  mutate(donation_n = replace_na(donation_n, 0),
+         donation_amount = replace_na(donation_amount, 0))
+```
+
+Total amount donated by residents of Hamilton CMA:
+```{r}
+sum(hamilton_da_2016$donation_amount)
+```
+
+Total number of donations by residents of Hamilton CMA:
+```{r}
+sum(hamilton_da_2016$donation_n)
+```
+
+Number of individual donations divided by population:
+```{r}
+sum(hamilton_da_2016$donation_n)/sum(hamilton_da_2016$Population) * 100
+```
+
+Number of DAs with at least one donation:
+```{r}
+hamilton_da_2016 %>%
+  filter(donation_n != 0) %>%
+  nrow()
+```
+
+
+
+Donations:
+```{r}
+ggplot(hamilton_da_2016,
+       aes(x = donation_amount)) +
+  geom_histogram(binwidth = 50) + 
+  xlab("Donation amount by DA ($)") + 
+  ylab("Count of Dissemination Areas") +
+  theme_minimal()
+```
+
+
+Plot number of donations:
+```{r}
+ggplot() + 
+  geom_sf(data = hamilton_da_2016 %>%
+            mutate(donation_n = case_when(donation_n == 0 ~ "0",
+                                          donation_n > 0 & donation_n <= 5 ~ "(0, 5]",
+                                          donation_n > 5 & donation_n <= 10 ~ "(5, 10]",
+                                          donation_n > 10 ~ "(10, 15]"),
+                   donation_n = factor(donation_n, 
+                                       levels = c("0", "(0, 5]", "(5, 10]", "(10, 15]"),
+                                       ordered = TRUE)),
+          aes(fill = donation_n),
+          color = "black",
+          size = 0.01) +
+  scale_fill_manual(name = "Individual donations",
+                    values = c("0" = "white", 
+                               "(0, 5]" = "darkgoldenrod1", 
+                               "(5, 10]" = "darkorange", 
+                               "(10, 15]" = "brown1")) +
+  theme_minimal()
+```
+
+Plot number of donations in the cartogram:
+```{r}
+ggplot() + 
+  geom_sf(data = DA_pop_cartogram %>%
+            mutate(donation_n = case_when(donation_n == 0 ~ "0",
+                                          donation_n > 0 & donation_n <= 5 ~ "(0, 5]",
+                                          donation_n > 5 & donation_n <= 10 ~ "(5, 10]",
+                                          donation_n > 10 ~ "(10, 15]"),
+                   donation_n = factor(donation_n, 
+                                       levels = c("0", "(0, 5]", "(5, 10]", "(10, 15]"),
+                                       ordered = TRUE)),
+          aes(fill = donation_n),
+          color = "black",
+          size = 0.01) +
+  scale_fill_manual(name = "Individual donations",
+                    values = c("0" = "white", 
+                               "(0, 5]" = "darkgoldenrod1", 
+                               "(5, 10]" = "darkorange", 
+                               "(10, 15]" = "brown1")) +
+  theme_minimal()
+```
+
+Plot amount of donations:
+```{r}
+ggplot() + 
+  geom_sf(data = hamilton_da_2016 %>%
+            mutate(donation_amount = case_when(donation_amount == 0 ~ "0",
+                                          donation_amount > 0 & donation_amount <= 50 ~ "(0, 50]",
+                                          donation_amount > 50 & donation_amount <= 100 ~ "(50, 100]",
+                                          donation_amount > 100 ~ ">100"),
+                   donation_amount = factor(donation_amount, 
+                                       levels = c("0", "(0, 50]", "(50, 100]", ">100"),
+                                       ordered = TRUE)),
+          aes(fill = donation_amount),
+          color = "black",
+          size = 0.01) +
+  scale_fill_manual(name = "Total amounts by DA",
+                    values = c("0" = "white", 
+                               "(0, 50]" = "darkgoldenrod1", 
+                               "(50, 100]" = "darkorange", 
+                               ">100" = "brown1")) +
+  theme_minimal()
+```
+
+Plot number of donations in the cartogram:
+```{r}
+ggplot() + 
+  geom_sf(data = DA_pop_cartogram %>%
+            mutate(donation_amount = case_when(donation_amount == 0 ~ "0",
+                                          donation_amount > 0 & donation_amount <= 50 ~ "(0, 50]",
+                                          donation_amount > 50 & donation_amount <= 100 ~ "(50, 100]",
+                                          donation_amount > 100 ~ ">100"),
+                   donation_amount = factor(donation_amount, 
+                                       levels = c("0", "(0, 50]", "(50, 100]", ">100"),
+                                       ordered = TRUE)),
+          aes(fill = donation_amount),
+          color = "black",
+          size = 0.01) +
+  scale_fill_manual(name = "Total amounts by DA",
+                    values = c("0" = "white", 
+                               "(0, 50]" = "darkgoldenrod1", 
+                               "(50, 100]" = "darkorange", 
+                               ">100" = "brown1")) +
+  theme_minimal()
+```
